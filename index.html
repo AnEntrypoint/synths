@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Objekt — Modeling Synthesizer</title>
+  <link rel="icon" type="image/svg+xml" href="public/icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "webjsx": "https://cdn.jsdelivr.net/npm/webjsx@0.0.42/dist/index.js",
+      "webjsx/jsx-runtime": "https://cdn.jsdelivr.net/npm/webjsx@0.0.42/dist/jsx-runtime.js"
+    }
+  }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      }
+    }
+  </script>
+  <style>
+    #app { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { init } from './objekt/main.js';
+    document.addEventListener('DOMContentLoaded', () => init());
+  </script>
+</body>
+</html>

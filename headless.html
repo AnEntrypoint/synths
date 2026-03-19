@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Objekt — Headless Renderer</title>
+  <link rel="icon" type="image/svg+xml" href="public/icon.svg" />
+  <script type="importmap">
+  {
+    "imports": {
+      "webjsx": "https://cdn.jsdelivr.net/npm/webjsx@0.0.42/dist/index.js",
+      "webjsx/jsx-runtime": "https://cdn.jsdelivr.net/npm/webjsx@0.0.42/dist/jsx-runtime.js"
+    }
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+    .container { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 24px; font-weight: 900; margin: 0 0 4px; color: #dca628; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 24px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .section { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #aaa; margin-bottom: 4px; }
+    select, input[type="number"], input[type="text"] {
+      width: 100%; padding: 8px 10px; background: #0a0a0a; border: 1px solid #333;
+      border-radius: 4px; color: #dca628; font-family: monospace; font-size: 13px; margin-bottom: 12px;
+    }
+    select:focus, input:focus { outline: none; border-color: #dca628; }
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px 20px; border-radius: 4px; border: 1px solid #dca628;
+      background: #dca628; color: #000; font-size: 13px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; width: 100%;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { background: #222; color: #dca628; border-color: #444; }
+    .progress-wrap { background: #0a0a0a; border-radius: 4px; height: 24px; overflow: hidden; margin-bottom: 12px; display: none; }
+    .progress-bar { height: 100%; background: #dca628; transition: width 0.3s; width: 0%; }
+    .progress-label { font-size: 11px; color: #666; text-align: center; margin-bottom: 8px; }
+    .note-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .note-row { display: flex; gap: 8px; align-items: center; background: #0a0a0a; padding: 6px 8px; border-radius: 4px; border: 1px solid #222; }
+    .note-row input { margin-bottom: 0; flex: 1; }
+    .note-row button { background: #333; border: 1px solid #444; color: #888; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; }
+    .add-note { background: #222; border: 1px dashed #444; color: #666; padding: 8px; text-align: center; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .file-input-wrap { position: relative; }
+    .file-input-wrap input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Objekt Renderer</h1>
+    <div class="subtitle">Offline Audio Rendering</div>
+
+    <div class="section">
+      <div class="section-title">Patch</div>
+      <label>Factory Preset</label>
+      <select id="preset-select"></select>
+
+      <label>Or Load Patch File</label>
+      <div class="file-input-wrap">
+        <button class="btn btn-secondary" style="margin-bottom:12px">Load .json Patch</button>
+        <input type="file" id="patch-file" accept=".json" />
+      </div>
+      <div id="patch-name" style="font-size:11px;color:#666;margin-bottom:4px;"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Notes</div>
+      <div class="note-list" id="note-list"></div>
+      <div class="add-note" id="add-note">+ Add Note</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Settings</div>
+      <div class="row">
+        <div>
+          <label>Sample Rate</label>
+          <select id="sample-rate">
+            <option value="44100" selected>44100 Hz</option>
+            <option value="48000">48000 Hz</option>
+            <option value="96000">96000 Hz</option>
+          </select>
+        </div>
+        <div>
+          <label>Bit Depth</label>
+          <select id="bit-depth">
+            <option value="16" selected>16-bit</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-label" id="progress-label"></div>
+
+    <button class="btn" id="render-btn">Render & Download WAV</button>
+  </div>
+
+  <script type="module">
+    import { PRESETS, DEFAULT_PARAMS } from './objekt/constants.js';
+    import { renderNote, renderPatch, audioBufferToWav } from './objekt/render.js';
+    import { importPatch, listFactoryPatches, exportPatch } from './objekt/patches.js';
+
+    let currentParams = { ...DEFAULT_PARAMS };
+    let notes = [{ freq: 261.63, time: 0, duration: 1.0 }];
+
+    const presetSelect = document.getElementById('preset-select');
+    const patchFile = document.getElementById('patch-file');
+    const patchName = document.getElementById('patch-name');
+    const noteList = document.getElementById('note-list');
+    const addNoteBtn = document.getElementById('add-note');
+    const renderBtn = document.getElementById('render-btn');
+    const progressWrap = document.getElementById('progress-wrap');
+    const progressBar = document.getElementById('progress-bar');
+    const progressLabel = document.getElementById('progress-label');
+    const sampleRateSelect = document.getElementById('sample-rate');
+
+    listFactoryPatches().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      presetSelect.appendChild(opt);
+    });
+
+    presetSelect.addEventListener('change', () => {
+      const name = presetSelect.value;
+      currentParams = { ...DEFAULT_PARAMS, ...PRESETS[name] };
+      patchName.textContent = 'Preset: ' + name;
+    });
+    presetSelect.dispatchEvent(new Event('change'));
+
+    patchFile.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const patch = importPatch(text);
+        currentParams = patch.params;
+        patchName.textContent = 'Loaded: ' + patch.name;
+      } catch (err) {
+        patchName.textContent = 'Error: ' + err.message;
+      }
+    });
+
+    function renderNotes() {
+      noteList.innerHTML = '';
+      notes.forEach((note, idx) => {
+        const row = document.createElement('div');
+        row.className = 'note-row';
+        row.innerHTML = `
+          <input type="number" value="${note.freq}" step="0.01" placeholder="Hz" title="Frequency (Hz)" style="width:80px" />
+          <input type="number" value="${note.time}" step="0.1" min="0" placeholder="Time" title="Start time (s)" style="width:70px" />
+          <input type="number" value="${note.duration}" step="0.1" min="0.05" placeholder="Dur" title="Duration (s)" style="width:70px" />
+          <button data-idx="${idx}">X</button>
+        `;
+        const inputs = row.querySelectorAll('input');
+        inputs[0].addEventListener('change', (e) => { notes[idx].freq = parseFloat(e.target.value) || 261.63; });
+        inputs[1].addEventListener('change', (e) => { notes[idx].time = parseFloat(e.target.value) || 0; });
+        inputs[2].addEventListener('change', (e) => { notes[idx].duration = parseFloat(e.target.value) || 0.5; });
+        row.querySelector('button').addEventListener('click', () => {
+          notes.splice(idx, 1);
+          if (notes.length === 0) notes.push({ freq: 261.63, time: 0, duration: 1.0 });
+          renderNotes();
+        });
+        noteList.appendChild(row);
+      });
+    }
+
+    addNoteBtn.addEventListener('click', () => {
+      const last = notes[notes.length - 1];
+      notes.push({ freq: last.freq, time: last.time + last.duration + 0.1, duration: last.duration });
+      renderNotes();
+    });
+
+    renderBtn.addEventListener('click', async () => {
+      renderBtn.disabled = true;
+      progressWrap.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressLabel.textContent = 'Rendering...';
+
+      try {
+        const sr = parseInt(sampleRateSelect.value);
+        let wavData;
+
+        if (notes.length === 1 && notes[0].time === 0) {
+          progressBar.style.width = '30%';
+          const buffer = await renderNote(currentParams, notes[0].freq, notes[0].duration, sr);
+          progressBar.style.width = '80%';
+          wavData = audioBufferToWav(buffer);
+        } else {
+          progressBar.style.width = '30%';
+          wavData = await renderPatch(currentParams, notes, sr);
+        }
+
+        progressBar.style.width = '100%';
+        progressLabel.textContent = 'Done! Downloading...';
+
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (patchName.textContent || 'objekt-render') + '.wav';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setTimeout(() => { progressLabel.textContent = 'Render complete.'; }, 500);
+      } catch (err) {
+        progressLabel.textContent = 'Error: ' + err.message;
+        console.error(err);
+      } finally {
+        renderBtn.disabled = false;
+      }
+    });
+
+    renderNotes();
+  </script>
+</body>
+</html>
