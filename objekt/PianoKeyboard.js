@@ -22,14 +22,12 @@ function rerender() {
 }
 
 function handleNoteOn(freq) {
-  pressedKeys = new Set(pressedKeys);
   pressedKeys.add(freq);
   pianoProps.onNoteOn(freq);
   rerender();
 }
 
 function handleNoteOff(freq) {
-  pressedKeys = new Set(pressedKeys);
   pressedKeys.delete(freq);
   rerender();
 }
