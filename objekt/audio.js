@@ -47,6 +47,16 @@ export function createAudioEngine(onChange) {
 
   const currentRevSize = { current: -1 };
   const currentRevDecay = { current: -1 };
+  const routingMode = { current: 'Parallel' };
+  const couplingMode = { current: 'Off' };
+  const crossModalToObj1 = { current: null };
+  const crossModalToObj2 = { current: null };
+  const crossObj1ToObj2 = { current: null };
+  const crossObj2ToObj1 = { current: null };
+  const couplingGain = { current: null };
+  const portaTarget = { current: null };
+  const portaTimer = { current: null };
+  const releaseTimer = { current: null };
 
   function notify() { onChange({ engineStarted, micState, inputLevel }); }
 
@@ -153,14 +163,22 @@ export function createAudioEngine(onChange) {
       currentRevSize.current = newRevSize;
       currentRevDecay.current = newRevDecay;
     }
+    const dampSlope = 0.5 + (p.dampingSlope ?? 0.5) * 2;
+    const dampGainScale = 0.3 + (p.dampingGain ?? 0.5) * 1.7;
+    const dispFilterScale = 1 + ((p.dispersionFilter ?? 0.5) - 0.5) * 0.06;
     filterBank.current.forEach((node, i) => {
       const mult = p[`modalFreq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.08 * i * (i + 0.5);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.08 * i * (i + 0.5);
       const finalFreq = Math.min(pitchedBase * mult * dispersionShift, nyquist - 100);
       const freqRatio = finalFreq / pitchedBase;
-      const hiDampFactor = 1 + (freqRatio - 1) * p.dampingHi * 1.5;
+      const freqHz = finalFreq;
+      const lowDamp = freqHz < 500 ? (1 - freqHz / 500) * (p.dampingLow ?? 0.4) : 0;
+      const midBand = Math.exp(-Math.pow(Math.log2(Math.max(20, freqHz) / 1000), 2) / 2);
+      const midDamp = midBand * (p.dampingMid ?? 0.45);
+      const hiDamp = Math.max(0, freqRatio - 1) * p.dampingHi;
+      const totalDamp = 1 + (lowDamp + midDamp + hiDamp) * dampGainScale * dampSlope;
       const baseQ = 15 + p.decayTime * 350;
-      const qVal = Math.max(5, baseQ / hiDampFactor);
+      const qVal = Math.max(5, baseQ / totalDamp);
       node.f1.frequency.setTargetAtTime(finalFreq, now, T);
       node.f2.frequency.setTargetAtTime(finalFreq, now, T);
       node.f1.Q.setTargetAtTime(qVal, now, T);
@@ -174,15 +192,22 @@ export function createAudioEngine(onChange) {
     const targetDecaySec = 0.3 + p.decayTime * 4.5;
     obj1Bank.current.forEach((node, i) => {
       const mult = p[`obj1Freq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.04 * i * (i + 0.3);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.04 * i * (i + 0.3);
       const finalFreq = Math.max(20, Math.min(pitchedBase * mult * dispersionShift, nyquist - 100));
       node.delay.delayTime.setTargetAtTime(1.0 / finalFreq, now, T);
       const freqRatio = finalFreq / pitchedBase;
-      const dampCutoff = Math.max(150, baseDampCutoff / (1 + (freqRatio - 1) * 0.3));
+      const freqHz = finalFreq;
+      const lowDamp = freqHz < 500 ? (1 - freqHz / 500) * (p.dampingLow ?? 0.4) : 0;
+      const midBand = Math.exp(-Math.pow(Math.log2(Math.max(20, freqHz) / 1000), 2) / 2);
+      const midDamp = midBand * (p.dampingMid ?? 0.45);
+      const hiDamp = Math.max(0, freqRatio - 1) * p.dampingHi;
+      const totalDampFactor = (lowDamp + midDamp + hiDamp) * dampGainScale * dampSlope;
+      const dampCutoff = Math.max(150, baseDampCutoff / (1 + totalDampFactor * 0.3));
       node.damp.frequency.setTargetAtTime(dampCutoff, now, T);
       node.damp.Q.setTargetAtTime(0.5, now, T);
       const cyclesTotal = targetDecaySec * finalFreq;
-      const fbLevel = Math.min(0.9985, Math.pow(0.001, 1 / cyclesTotal));
+      const rawFb = Math.pow(0.001, 1 / cyclesTotal);
+      const fbLevel = Math.min(0.9985, rawFb * (1 - totalDampFactor * 0.002));
       node.fb.gain.setTargetAtTime(fbLevel, now, T);
       const partialGain = p[`obj1_${i}`] ?? 0.5;
       node.out.gain.setTargetAtTime(partialGain * 0.22, now, T);
@@ -191,15 +216,22 @@ export function createAudioEngine(onChange) {
     });
     obj2Bank.current.forEach((node, i) => {
       const mult = p[`obj2Freq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.05 * i * (i + 0.4);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.05 * i * (i + 0.4);
       const finalFreq = Math.max(20, Math.min(pitchedBase * mult * dispersionShift, nyquist - 100));
       node.delay.delayTime.setTargetAtTime(1.0 / finalFreq, now, T);
       const freqRatio = finalFreq / pitchedBase;
-      const dampCutoff = Math.max(150, baseDampCutoff / (1 + (freqRatio - 1) * 0.35));
+      const freqHz = finalFreq;
+      const lowDamp = freqHz < 500 ? (1 - freqHz / 500) * (p.dampingLow ?? 0.4) : 0;
+      const midBand = Math.exp(-Math.pow(Math.log2(Math.max(20, freqHz) / 1000), 2) / 2);
+      const midDamp = midBand * (p.dampingMid ?? 0.45);
+      const hiDamp = Math.max(0, freqRatio - 1) * p.dampingHi;
+      const totalDampFactor = (lowDamp + midDamp + hiDamp) * dampGainScale * dampSlope;
+      const dampCutoff = Math.max(150, baseDampCutoff / (1 + totalDampFactor * 0.35));
       node.damp.frequency.setTargetAtTime(dampCutoff, now, T);
       node.damp.Q.setTargetAtTime(0.6, now, T);
       const cyclesTotal = targetDecaySec * finalFreq;
-      const fbLevel = Math.min(0.9985, Math.pow(0.001, 1 / cyclesTotal));
+      const rawFb = Math.pow(0.001, 1 / cyclesTotal);
+      const fbLevel = Math.min(0.9985, rawFb * (1 - totalDampFactor * 0.002));
       node.fb.gain.setTargetAtTime(fbLevel, now, T);
       const partialGain = p[`obj2_${i}`] ?? 0.5;
       node.out.gain.setTargetAtTime(partialGain * 0.22, now, T);
@@ -209,7 +241,7 @@ export function createAudioEngine(onChange) {
     const micFbScale = 0.92;
     micFilterBank.current.forEach((node, i) => {
       const mult = p[`modalFreq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.08 * i * (i + 0.5);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.08 * i * (i + 0.5);
       const finalFreq = Math.min(pitchedBase * mult * dispersionShift, nyquist - 100);
       const freqRatio = finalFreq / pitchedBase;
       const hiDampFactor = 1 + (freqRatio - 1) * p.dampingHi * 1.5;
@@ -226,7 +258,7 @@ export function createAudioEngine(onChange) {
     });
     micObj1Bank.current.forEach((node, i) => {
       const mult = p[`obj1Freq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.04 * i * (i + 0.3);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.04 * i * (i + 0.3);
       const finalFreq = Math.max(20, Math.min(pitchedBase * mult * dispersionShift, nyquist - 100));
       node.delay.delayTime.setTargetAtTime(1.0 / finalFreq, now, T);
       const freqRatio = finalFreq / pitchedBase;
@@ -242,7 +274,7 @@ export function createAudioEngine(onChange) {
     });
     micObj2Bank.current.forEach((node, i) => {
       const mult = p[`obj2Freq${i}`] ?? 1;
-      const dispersionShift = 1 + p.dispersionFreq * 0.05 * i * (i + 0.4);
+      const dispersionShift = 1 + p.dispersionFreq * dispFilterScale * 0.05 * i * (i + 0.4);
       const finalFreq = Math.max(20, Math.min(pitchedBase * mult * dispersionShift, nyquist - 100));
       node.delay.delayTime.setTargetAtTime(1.0 / finalFreq, now, T);
       const freqRatio = finalFreq / pitchedBase;
@@ -508,13 +540,102 @@ export function createAudioEngine(onChange) {
       del.connect(out); out.connect(panner); panner.connect(micResBus);
       return { delay: del, damp, fb, out, panner };
     });
+    crossModalToObj1.current = audioCtx.createGain(); crossModalToObj1.current.gain.value = 0;
+    crossModalToObj2.current = audioCtx.createGain(); crossModalToObj2.current.gain.value = 0;
+    crossObj1ToObj2.current = audioCtx.createGain(); crossObj1ToObj2.current.gain.value = 0;
+    crossObj2ToObj1.current = audioCtx.createGain(); crossObj2ToObj1.current.gain.value = 0;
+    couplingGain.current = audioCtx.createGain(); couplingGain.current.gain.value = 0;
+    modalBus.current.connect(crossModalToObj1.current);
+    modalBus.current.connect(crossModalToObj2.current);
+    obj1Bus.current.connect(crossObj1ToObj2.current);
+    obj2Bus.current.connect(crossObj2ToObj1.current);
+    obj1Bus.current.connect(couplingGain.current);
+    obj2Bus.current.connect(couplingGain.current);
+    crossModalToObj1.current.connect(lowCutHPF.current);
+    crossModalToObj2.current.connect(lowCutHPF.current);
+    crossObj1ToObj2.current.connect(lowCutHPF.current);
+    crossObj2ToObj1.current.connect(lowCutHPF.current);
+    couplingGain.current.connect(lowCutHPF.current);
+    obj1Bank.current.forEach((n) => { crossModalToObj1.current.connect(n.delay); });
+    obj2Bank.current.forEach((n) => { crossModalToObj2.current.connect(n.delay); });
+    obj1Bank.current.forEach((n, i) => {
+      if (obj2Bank.current[i]) crossObj1ToObj2.current.connect(obj2Bank.current[i].delay);
+    });
+    obj2Bank.current.forEach((n, i) => {
+      if (obj1Bank.current[i]) crossObj2ToObj1.current.connect(obj1Bank.current[i].delay);
+    });
+    if (params.routingMode && params.routingMode !== 'Parallel') updateRouting(params.routingMode);
+    if (params.couplingMode && params.couplingMode !== 'Off') updateCoupling(params.couplingMode);
     applyTuning(currentPitchRef.current, params);
     engineStarted = true;
     notify();
   }
 
+  function releaseNote(params) {
+    if (!ctx.current) return;
+    const muteAmt = params.decayRelMute ?? 0;
+    if (muteAmt < 0.01) return;
+    if (releaseTimer.current) clearTimeout(releaseTimer.current);
+    const now = ctx.current.currentTime;
+    const muteTime = 0.005 + (1 - muteAmt) * 0.5;
+    filterBank.current.forEach(node => {
+      const curQ = node.f1.Q.value;
+      node.f1.Q.setTargetAtTime(Math.max(1, curQ * (1 - muteAmt * 0.9)), now, muteTime);
+      node.f2.Q.setTargetAtTime(Math.max(1, node.f2.Q.value * (1 - muteAmt * 0.9)), now, muteTime);
+    });
+    obj1Bank.current.forEach(node => {
+      node.fb.gain.setTargetAtTime(node.fb.gain.value * (1 - muteAmt * 0.95), now, muteTime);
+    });
+    obj2Bank.current.forEach(node => {
+      node.fb.gain.setTargetAtTime(node.fb.gain.value * (1 - muteAmt * 0.95), now, muteTime);
+    });
+    micFilterBank.current.forEach(node => {
+      node.f1.Q.setTargetAtTime(Math.max(1, node.f1.Q.value * (1 - muteAmt * 0.85)), now, muteTime);
+      node.f2.Q.setTargetAtTime(Math.max(1, node.f2.Q.value * (1 - muteAmt * 0.85)), now, muteTime);
+    });
+    micObj1Bank.current.forEach(node => {
+      node.fb.gain.setTargetAtTime(node.fb.gain.value * (1 - muteAmt * 0.9), now, muteTime);
+    });
+    micObj2Bank.current.forEach(node => {
+      node.fb.gain.setTargetAtTime(node.fb.gain.value * (1 - muteAmt * 0.9), now, muteTime);
+    });
+  }
+
+  function updateRouting(mode) {
+    if (!ctx.current || !crossModalToObj1.current) return;
+    routingMode.current = mode;
+    const serial12 = mode === 'Serial M→1→2';
+    const serial21 = mode === 'Serial M→2→1';
+    crossModalToObj1.current.gain.value = serial12 ? 0.35 : 0;
+    crossModalToObj2.current.gain.value = serial21 ? 0.35 : 0;
+    crossObj1ToObj2.current.gain.value = serial12 ? 0.25 : 0;
+    crossObj2ToObj1.current.gain.value = serial21 ? 0.25 : 0;
+  }
+
+  function updateCoupling(mode) {
+    if (!ctx.current || !couplingGain.current) return;
+    couplingMode.current = mode;
+    couplingGain.current.gain.value = mode === 'Off' ? 0 : mode === 'On' ? 0.15 : 0.25;
+  }
+
   function triggerNote(freq, params) {
     if (!ctx.current) return;
+    const prevFreq = currentPitchRef.current;
+    const portaRate = params.portamentoRate ?? 0;
+    if (portaRate > 0.01 && prevFreq && prevFreq !== freq) {
+      if (portaTimer.current) clearInterval(portaTimer.current);
+      const glideTime = portaRate * 500;
+      const startFreq = prevFreq;
+      const startTime = performance.now();
+      portaTimer.current = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(1, elapsed / glideTime);
+        const curFreq = startFreq * Math.pow(freq / startFreq, t);
+        currentPitchRef.current = curFreq;
+        applyTuning(curFreq, params);
+        if (t >= 1) { clearInterval(portaTimer.current); portaTimer.current = null; }
+      }, 16);
+    }
     currentPitchRef.current = freq;
     applyTuning(freq, params);
     const extIsActive = micSource.current !== null && params.extInputMix > 0.001;
@@ -626,7 +747,59 @@ export function createAudioEngine(onChange) {
       noiseSrc.start(noiseStart);
       noiseSrc.stop(noiseStart + a + d + 0.8 + r * 3);
     }
+    if ((params.collisionAmount ?? 0) > 0.01) {
+      const bounceCount = Math.floor(2 + (params.collisionBounce ?? 0.5) * 8);
+      for (let b = 0; b < bounceCount; b++) {
+        const bDelay = 0.02 + b * (0.015 + (1 - (params.collisionBounce ?? 0.5)) * 0.05);
+        const bAmp = params.collisionAmount * Math.pow(0.5 + (params.collisionBounce ?? 0.5) * 0.3, b + 1);
+        if (bAmp < 0.005) break;
+        const bTime = now + bDelay;
+        const bSrc = ctx.current.createBufferSource();
+        bSrc.buffer = noiseBuffer.current;
+        const bFilt = ctx.current.createBiquadFilter();
+        bFilt.type = 'bandpass';
+        bFilt.frequency.value = 600 + (params.impactHardness ?? 0.5) * 5000;
+        bFilt.Q.value = 1.5 + (params.impactHardness ?? 0.5) * 3;
+        const bEnv = ctx.current.createGain();
+        bEnv.gain.setValueAtTime(0, bTime);
+        bEnv.gain.linearRampToValueAtTime(bAmp * 1.5, bTime + 0.001);
+        bEnv.gain.exponentialRampToValueAtTime(0.0001, bTime + 0.012);
+        bSrc.connect(bFilt); bFilt.connect(bEnv); bEnv.connect(burstGain);
+        bSrc.start(bTime); bSrc.stop(bTime + 0.04);
+      }
+    }
+    if ((params.pitchModAmount ?? 0) > 0.01) {
+      const modDepth = params.pitchModAmount;
+      const modDecay = 0.05 + (1 - (params.pitchModFilter ?? 0.5)) * 0.4;
+      filterBank.current.forEach((node, i) => {
+        const curFreq = node.f1.frequency.value;
+        const modFreq = curFreq * (1 + modDepth * 0.2 * (1 + i * 0.08));
+        node.f1.frequency.setValueAtTime(modFreq, now);
+        node.f1.frequency.setTargetAtTime(curFreq, now + 0.005, modDecay);
+        node.f2.frequency.setValueAtTime(modFreq, now);
+        node.f2.frequency.setTargetAtTime(curFreq, now + 0.005, modDecay);
+      });
+      obj1Bank.current.forEach((node, i) => {
+        const curDelay = node.delay.delayTime.value;
+        const modDelay = curDelay / (1 + modDepth * 0.15 * (1 + i * 0.06));
+        node.delay.delayTime.setValueAtTime(modDelay, now);
+        node.delay.delayTime.setTargetAtTime(curDelay, now + 0.005, modDecay);
+      });
+      obj2Bank.current.forEach((node, i) => {
+        const curDelay = node.delay.delayTime.value;
+        const modDelay = curDelay / (1 + modDepth * 0.12 * (1 + i * 0.05));
+        node.delay.delayTime.setValueAtTime(modDelay, now);
+        node.delay.delayTime.setTargetAtTime(curDelay, now + 0.005, modDecay);
+      });
+    }
   }
 
-  return { get engineStarted() { return engineStarted; }, get micState() { return micState; }, get inputLevel() { return inputLevel; }, currentPitchRef, initAudio, triggerNote, applyTuning, requestMic, releaseMic };
+  return {
+    get engineStarted() { return engineStarted; },
+    get micState() { return micState; },
+    get inputLevel() { return inputLevel; },
+    currentPitchRef, initAudio, triggerNote, releaseNote, applyTuning,
+    requestMic, releaseMic, updateRouting, updateCoupling,
+    get compressor() { return compressor.current; },
+  };
 }

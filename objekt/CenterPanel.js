@@ -116,9 +116,12 @@ export function CenterPanel({ params, onChange, centerTab, setCenterTab }) {
         createElement('div', { style: 'text-align:right;width:100%;margin-bottom:8px;line-height:1;' }, '0\n', createElement('span', { style: 'font-size:8px;' }, 'KEY TRACK+')),
         createElement('div', { style: 'text-align:right;width:100%;margin-bottom:4px;font-size:8px;letter-spacing:-0.05em;' }, 'COUPLING'),
         createElement('div', { style: 'display:flex;flex-direction:column;gap:3px;align-items:flex-end;width:100%;margin-bottom:8px;font-size:8px;' },
-          ...[ { label: 'OFF', active: true }, { label: 'ON', active: false }, { label: 'X-OVER', active: true } ].map(({ label, active }) =>
-            createElement('span', { style: 'display:flex;align-items:center;gap:6px;' },
-              createElement('div', { style: `width:8px;height:8px;border-radius:50%;border:1px solid ${COLORS.lcdDark};background-color:${active ? COLORS.lcdBright : COLORS.lcdDark};` }),
+          ...[ { label: 'OFF', val: 'Off' }, { label: 'ON', val: 'On' }, { label: 'X-OVER', val: 'X-Over' } ].map(({ label, val }) =>
+            createElement('span', {
+              style: 'display:flex;align-items:center;gap:6px;cursor:pointer;',
+              onclick: () => onChange({ target: { name: 'couplingMode', value: val } }),
+            },
+              createElement('div', { style: `width:8px;height:8px;border-radius:50%;border:1px solid ${COLORS.lcdDark};background-color:${(p.couplingMode ?? 'Off') === val ? COLORS.lcdBright : COLORS.lcdDark};` }),
               label
             )
           )

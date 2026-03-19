@@ -1,6 +1,8 @@
 import { createElement, applyDiff } from 'webjsx';
-import { COLORS, PRESETS, DEFAULT_PARAMS } from './constants.js';
+import { COLORS, PRESETS, DEFAULT_PARAMS, MOD_MATRIX_ROWS } from './constants.js';
 import { createAudioEngine } from './audio.js';
+import { createLFO, createEnvelope, createCurve } from './lfo.js';
+import { processModMatrix, applyModOffsets } from './modulation.js';
 import { Knob } from './Knob.js';
 import { ExciterPanel } from './ExciterPanel.js';
 import { CenterPanel } from './CenterPanel.js';
@@ -14,6 +16,15 @@ const POWER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13
 const PLAY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="15" x="3" y="5" rx="1"/><polygon points="14 5 21 12 14 19"/></svg>`;
 const CHEVRON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 
+const lfo1 = createLFO();
+const lfo2 = createLFO();
+const modEnvelope = createEnvelope();
+const modCurve = createCurve();
+let lastVelocity = 0.8;
+let modWheel = 0;
+let modFrameId = null;
+let lastModTime = 0;
+
 const state = {
   uiScale: 1,
   vw: SYNTH_WIDTH,
@@ -23,6 +34,7 @@ const state = {
   currentPreset: 'Glass Wave',
   activeNoteFreq: null,
   params: { ...DEFAULT_PARAMS },
+  modMatrix: [...MOD_MATRIX_ROWS],
   engineStarted: false,
   micState: 'idle',
   inputLevel: 0,
@@ -39,9 +51,62 @@ const audio = createAudioEngine(({ engineStarted, micState, inputLevel }) => {
   render();
 });
 
+function syncLFOParams() {
+  const p = state.params;
+  lfo1.configure({
+    rate: 0.1 + p.lfo1Rate * 19.9,
+    depth: p.lfo1Depth,
+    waveform: p.lfo1Waveform ?? 'sine',
+    stepped: p.lfo1Stepped ?? false,
+    bipolar: p.lfo1Bipolar ?? false,
+    oneshot: p.lfo1Oneshot ?? false,
+    keySync: p.lfo1KeySync ?? true,
+    global: p.lfo1Global ?? false,
+  });
+  lfo2.configure({
+    rate: 0.1 + p.lfo2Rate * 9.9,
+    depth: p.lfo2Depth,
+    waveform: p.lfo2Waveform ?? 'square',
+    stepped: p.lfo2Stepped ?? false,
+    bipolar: p.lfo2Bipolar ?? false,
+    oneshot: p.lfo2Oneshot ?? false,
+    keySync: p.lfo2KeySync ?? true,
+    global: p.lfo2Global ?? false,
+  });
+  modEnvelope.configure({
+    attack: p.envAttack ?? 0.01,
+    decay: p.envDecay ?? 0.3,
+    sustain: p.envSustain ?? 0.5,
+    release: p.envRelease ?? 0.5,
+  });
+}
+
+function modTick(timestamp) {
+  if (!state.engineStarted) { modFrameId = requestAnimationFrame(modTick); return; }
+  const dt = lastModTime > 0 ? Math.min((timestamp - lastModTime) / 1000, 0.1) : 1 / 60;
+  lastModTime = timestamp;
+  const l1 = lfo1.tick(dt);
+  const l2 = lfo2.tick(dt);
+  const env = modEnvelope.tick(dt);
+  const crv = modCurve.tick(dt);
+  const sourceCtx = { velocity: lastVelocity, lfo1: l1, lfo2: l2, envelope: env, modWheel, curve: crv };
+  const offsets = processModMatrix(state.modMatrix, sourceCtx);
+  if (Object.keys(offsets).length > 0) {
+    const modulated = applyModOffsets(state.params, offsets);
+    if (offsets._lfo1Rate) lfo1.configure({ rate: Math.max(0.1, (0.1 + state.params.lfo1Rate * 19.9) + offsets._lfo1Rate * 10) });
+    if (offsets._lfo2Rate) lfo2.configure({ rate: Math.max(0.1, (0.1 + state.params.lfo2Rate * 9.9) + offsets._lfo2Rate * 5) });
+    audio.applyTuning(audio.currentPitchRef.current, modulated);
+  }
+  modFrameId = requestAnimationFrame(modTick);
+}
+
 function handleChange(e) {
   const { name, value } = e.target;
-  state.params = { ...state.params, [name]: typeof value === 'string' ? (parseFloat(value) || value) : value };
+  const parsed = typeof value === 'boolean' ? value : typeof value === 'string' ? (isNaN(parseFloat(value)) ? value : parseFloat(value)) : value;
+  state.params = { ...state.params, [name]: parsed };
+  if (name.startsWith('lfo') || name.startsWith('env') || name.startsWith('curve')) syncLFOParams();
+  if (name === 'routingMode' && state.engineStarted) audio.updateRouting(value);
+  if (name === 'couplingMode' && state.engineStarted) audio.updateCoupling(value);
   if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
   render();
 }
@@ -50,7 +115,12 @@ function loadPreset(e) {
   const name = e.target.value;
   state.currentPreset = name;
   state.params = { ...state.params, ...PRESETS[name] };
-  if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
+  syncLFOParams();
+  if (state.engineStarted) {
+    audio.applyTuning(audio.currentPitchRef.current, state.params);
+    if (state.params.routingMode) audio.updateRouting(state.params.routingMode);
+    if (state.params.couplingMode) audio.updateCoupling(state.params.couplingMode);
+  }
   render();
 }
 
@@ -68,8 +138,17 @@ function handleRandomize() {
 
 function handleNoteOn(freq) {
   state.activeNoteFreq = freq;
+  lastVelocity = 0.8;
+  modEnvelope.trigger();
+  modCurve.trigger();
+  if (lfo1.keySync) lfo1.reset();
+  if (lfo2.keySync) lfo2.reset();
   if (!state.engineStarted) {
-    audio.initAudio(state.params).then(() => audio.triggerNote(freq, state.params));
+    audio.initAudio(state.params).then(() => {
+      syncLFOParams();
+      if (!modFrameId) modFrameId = requestAnimationFrame(modTick);
+      audio.triggerNote(freq, state.params);
+    });
   } else {
     audio.triggerNote(freq, state.params);
   }
@@ -78,6 +157,8 @@ function handleNoteOn(freq) {
 
 function handleNoteOff() {
   state.activeNoteFreq = null;
+  modEnvelope.noteOff();
+  if (state.engineStarted) audio.releaseNote(state.params);
   updatePianoKeyboard({ activeFreq: null });
 }
 
@@ -224,6 +305,9 @@ function render() {
 export function init() {
   appContainer = document.getElementById('app');
   if (!appContainer) { console.error('No #app element found'); return; }
+
+  syncLFOParams();
+  modFrameId = requestAnimationFrame(modTick);
 
   render();
 
