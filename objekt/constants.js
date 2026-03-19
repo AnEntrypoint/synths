@@ -293,6 +293,18 @@ export const PRESETS = {
   },
 };
 
+export const LFO_DEFAULTS = {
+  lfo1Rate: 0.4, lfo1Depth: 0.5, lfo1Waveform: 'sine',
+  lfo1Stepped: false, lfo1BeatSync: false, lfo1Oneshot: false,
+  lfo1KeySync: true, lfo1Bipolar: false, lfo1Global: false,
+  lfo2Rate: 0.25, lfo2Depth: 0.5, lfo2Waveform: 'square',
+  lfo2Stepped: false, lfo2BeatSync: false, lfo2Oneshot: false,
+  lfo2KeySync: true, lfo2Bipolar: false, lfo2Global: false,
+  curveRate: 0.3, curveDepth: 0.6,
+  envAttack: 0.01, envDecay: 0.3, envSustain: 0.5, envRelease: 0.5,
+  portamentoRate: 0, pitchRange: 2,
+};
+
 export const DEFAULT_PARAMS = {
   masterVolume: 0.8,
   pitch: 0.5,
@@ -304,6 +316,7 @@ export const DEFAULT_PARAMS = {
   routingMode: 'Parallel',
   activePartials: 8,
   keyTrack: 8,
+  ...LFO_DEFAULTS,
   ...PRESETS['Glass Wave'],
 };
 
