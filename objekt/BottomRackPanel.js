@@ -1,40 +1,54 @@
 import { createElement } from 'webjsx';
-import { COLORS, MOD_MATRIX_ROWS, VOICE_MODES } from './constants.js';
+import { COLORS, MOD_MATRIX_ROWS, VOICE_MODES, ROUTING_MODES, COUPLING_MODES } from './constants.js';
 import { Knob } from './Knob.js';
 
 const LFO_TABS = ['LFO 1', 'LFO 2', 'Curve', 'Macro'];
+const LFO_WAVEFORMS = ['sine', 'triangle', 'saw', 'square', 'sh'];
 
 const CHEVRON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 
 export function BottomRackPanel({ lfoTab, setLfoTab, params, onChange }) {
   const voiceMode = params.voiceMode || 'Poly 8';
   const pitchRange = typeof params.pitchRange === 'number' ? params.pitchRange : 2;
+  const routingMode = params.routingMode || 'Parallel';
+  const couplingMode = params.couplingMode || 'Off';
+  const portaRate = params.portamentoRate ?? 0;
 
-  const lfoPath = lfoTab === 'LFO 1'
-    ? 'M0,20 Q10,0 20,20 Q30,40 40,20 Q50,0 60,20 Q70,40 80,20 Q90,0 100,20'
-    : lfoTab === 'LFO 2'
-    ? 'M0,20 L20,20 L20,5 L40,5 L40,35 L60,35 L60,5 L80,5 L80,35 L100,35'
-    : lfoTab === 'Curve'
-    ? 'M0,0 Q20,30 100,38'
+  const lfoPrefix = lfoTab === 'LFO 1' ? 'lfo1' : lfoTab === 'LFO 2' ? 'lfo2' : 'curve';
+  const currentWaveform = lfoTab === 'LFO 1' ? (params.lfo1Waveform ?? 'sine') : lfoTab === 'LFO 2' ? (params.lfo2Waveform ?? 'square') : 'exponential';
+  const lfoRate = lfoTab === 'LFO 1' ? (params.lfo1Rate ?? 0.4) : lfoTab === 'LFO 2' ? (params.lfo2Rate ?? 0.25) : (params.curveRate ?? 0.3);
+  const lfoDepth = lfoTab === 'LFO 1' ? (params.lfo1Depth ?? 0.5) : lfoTab === 'LFO 2' ? (params.lfo2Depth ?? 0.5) : (params.curveDepth ?? 0.6);
+
+  const lfoPath = currentWaveform === 'sine' ? 'M0,20 Q10,0 20,20 Q30,40 40,20 Q50,0 60,20 Q70,40 80,20 Q90,0 100,20'
+    : currentWaveform === 'square' ? 'M0,20 L20,20 L20,5 L40,5 L40,35 L60,35 L60,5 L80,5 L80,35 L100,35'
+    : currentWaveform === 'saw' ? 'M0,35 L25,5 L25,35 L50,5 L50,35 L75,5 L75,35 L100,5'
+    : currentWaveform === 'triangle' ? 'M0,20 L12.5,5 L37.5,35 L62.5,5 L87.5,35 L100,20'
+    : currentWaveform === 'sh' ? 'M0,15 L15,15 L15,30 L30,30 L30,8 L50,8 L50,25 L65,25 L65,12 L80,12 L80,32 L100,32'
+    : lfoTab === 'Curve' ? 'M0,0 Q20,30 100,38'
     : 'M0,38 L25,30 L50,10 L75,25 L100,5';
 
-  const lfoHz = lfoTab === 'Curve' ? '1.583Hz' : lfoTab === 'LFO 1' ? '2.00Hz' : lfoTab === 'LFO 2' ? '0.50Hz' : '--';
+  const dispHz = lfoTab === 'LFO 1' ? (0.1 + lfoRate * 19.9).toFixed(2) + 'Hz'
+    : lfoTab === 'LFO 2' ? (0.1 + lfoRate * 9.9).toFixed(2) + 'Hz'
+    : lfoTab === 'Curve' ? (lfoRate * 3).toFixed(2) + 's' : '--';
 
   return createElement('div', {
     style: `min-height:170px;flex-shrink:0;padding:16px;display:flex;gap:16px;border-top:1px solid #111;background-color:${COLORS.modDark};`,
   },
-    createElement('div', { style: 'width:128px;border-right:1px solid #444;padding-right:16px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;' },
+    createElement('div', { style: 'width:148px;border-right:1px solid #444;padding-right:16px;display:flex;flex-direction:column;gap:6px;flex-shrink:0;' },
       createElement('div', { style: `display:flex;justify-content:space-between;font-size:9px;font-weight:700;color:${COLORS.modYellow};` },
         createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;' },
-          createElement('div', { style: `padding:2px 6px;border-radius:2px;box-shadow:inset 0 0 4px rgba(0,0,0,0.4);margin-bottom:4px;display:flex;align-items:center;gap:4px;font-size:9px;cursor:pointer;background:black;color:${COLORS.modYellow};`, innerHTML: CHEVRON_SVG + ' Off' }),
+          createElement('div', {
+            style: `padding:2px 6px;border-radius:2px;box-shadow:inset 0 0 4px rgba(0,0,0,0.4);margin-bottom:4px;display:flex;align-items:center;gap:4px;font-size:9px;cursor:pointer;background:black;color:${portaRate > 0.01 ? COLORS.modYellow : '#666'};`,
+            onclick: () => onChange({ target: { name: 'portamentoRate', value: portaRate > 0.01 ? 0 : 0.3 } }),
+          }, portaRate > 0.01 ? 'On' : 'Off'),
           createElement('span', {}, 'Portamento'),
         ),
         createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;' },
-          Knob({ value: 0.5, size: 18, color: COLORS.modYellow }),
+          Knob({ value: portaRate, name: 'portamentoRate', onChange, size: 18, color: COLORS.modYellow }),
           createElement('span', {}, 'Rate'),
         )
       ),
-      createElement('div', { style: `display:flex;justify-content:space-between;font-size:9px;font-weight:700;color:${COLORS.modYellow};` },
+      createElement('div', { style: `display:flex;justify-content:space-between;font-size:9px;font-weight:700;color:${COLORS.modYellow};gap:4px;` },
         createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;width:100%;' },
           createElement('div', {
             style: `padding:2px 12px;border-radius:2px;box-shadow:inset 0 0 4px rgba(0,0,0,0.4);margin-bottom:4px;font-family:monospace;cursor:pointer;background:black;color:${COLORS.modYellow};`,
@@ -54,10 +68,28 @@ export function BottomRackPanel({ lfoTab, setLfoTab, params, onChange }) {
           createElement('span', {}, 'Key Mode'),
         )
       ),
-      createElement('div', { style: 'flex:1;display:flex;gap:16px;justify-content:center;align-items:flex-end;padding-bottom:4px;margin-top:8px;' },
+      createElement('div', { style: `display:flex;justify-content:space-between;font-size:9px;font-weight:700;color:${COLORS.modYellow};gap:4px;` },
+        createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;width:100%;position:relative;' },
+          createElement('select', {
+            value: routingMode,
+            onchange: (e) => onChange({ target: { name: 'routingMode', value: e.target.value } }),
+            style: `padding:2px 4px;border-radius:2px;box-shadow:inset 0 0 4px rgba(0,0,0,0.4);margin-bottom:4px;font-size:8px;font-weight:700;cursor:pointer;text-align:center;width:100%;background:black;color:${COLORS.modYellow};border:none;outline:none;appearance:none;`,
+          }, ...ROUTING_MODES.map(m => createElement('option', { value: m }, m))),
+          createElement('span', {}, 'Routing'),
+        ),
+        createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;width:100%;position:relative;' },
+          createElement('select', {
+            value: couplingMode,
+            onchange: (e) => onChange({ target: { name: 'couplingMode', value: e.target.value } }),
+            style: `padding:2px 4px;border-radius:2px;box-shadow:inset 0 0 4px rgba(0,0,0,0.4);margin-bottom:4px;font-size:8px;font-weight:700;cursor:pointer;text-align:center;width:100%;background:black;color:${COLORS.modYellow};border:none;outline:none;appearance:none;`,
+          }, ...COUPLING_MODES.map(m => createElement('option', { value: m }, m))),
+          createElement('span', {}, 'Coupling'),
+        )
+      ),
+      createElement('div', { style: 'flex:1;display:flex;gap:16px;justify-content:center;align-items:flex-end;padding-bottom:4px;margin-top:4px;' },
         ...['Pitch', 'Mod'].map((lbl, i) =>
           createElement('div', { key: lbl, style: 'display:flex;flex-direction:column;align-items:center;gap:4px;' },
-            createElement('div', { style: 'width:16px;height:48px;border-radius:2px;border:1px solid #444;position:relative;background:black;box-shadow:inset 0 2px 5px rgba(0,0,0,0.8);' },
+            createElement('div', { style: 'width:16px;height:40px;border-radius:2px;border:1px solid #444;position:relative;background:black;box-shadow:inset 0 2px 5px rgba(0,0,0,0.8);' },
               createElement('div', { style: `width:100%;height:10px;border-radius:2px;border-top:1px solid #aaa;position:absolute;background:#888;${i === 0 ? 'top:50%;transform:translateY(-50%)' : 'bottom:0'};` })
             ),
             createElement('span', { style: 'font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#888;' }, lbl)
@@ -99,25 +131,50 @@ export function BottomRackPanel({ lfoTab, setLfoTab, params, onChange }) {
           }, t)
         )
       ),
-      createElement('div', { style: 'border-radius:3px;border:1px solid #444;height:65px;margin-top:4px;padding:4px;position:relative;box-shadow:inset 0 0 8px rgba(0,0,0,0.3);background:rgba(0,0,0,0.6);' },
+      createElement('div', { style: 'border-radius:3px;border:1px solid #444;height:55px;margin-top:4px;padding:4px;position:relative;box-shadow:inset 0 0 8px rgba(0,0,0,0.3);background:rgba(0,0,0,0.6);cursor:pointer;',
+        onclick: () => {
+          if (lfoTab === 'LFO 1' || lfoTab === 'LFO 2') {
+            const key = lfoPrefix + 'Waveform';
+            const idx = LFO_WAVEFORMS.indexOf(currentWaveform);
+            const next = LFO_WAVEFORMS[(idx + 1) % LFO_WAVEFORMS.length];
+            onChange({ target: { name: key, value: next } });
+          }
+        },
+      },
         createElement('svg', { viewBox: '0 0 100 40', preserveAspectRatio: 'none', style: 'width:100%;height:100%;fill:none;', 'stroke-width': 2, stroke: COLORS.modYellow },
           createElement('path', { d: lfoPath })
         ),
-        createElement('div', { style: `position:absolute;top:4px;left:4px;font-size:8px;padding:2px 6px;border-radius:2px;font-family:monospace;background:rgba(0,0,0,0.8);color:${COLORS.modYellow};` }, lfoHz)
+        createElement('div', { style: `position:absolute;top:4px;left:4px;font-size:8px;padding:2px 6px;border-radius:2px;font-family:monospace;background:rgba(0,0,0,0.8);color:${COLORS.modYellow};` }, dispHz),
+        (lfoTab === 'LFO 1' || lfoTab === 'LFO 2') ? createElement('div', { style: `position:absolute;top:4px;right:4px;font-size:7px;padding:2px 4px;border-radius:2px;text-transform:uppercase;background:rgba(0,0,0,0.8);color:${COLORS.modYellow};` }, currentWaveform) : null,
       ),
-      createElement('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:8px;font-weight:700;margin-top:4px;' },
-        ...[ { label: 'Stepped', def: false }, { label: 'Beat Sync', def: false }, { label: 'Oneshot', def: true }, { label: 'Key Sync', def: true }, { label: 'Bipolar', def: false }, { label: 'Global', def: false } ].map(({ label, def }) =>
-          createElement('label', { key: label, style: `display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:uppercase;letter-spacing:0.1em;color:${COLORS.modYellow};` },
-            createElement('input', { type: 'checkbox', defaultChecked: def, style: `width:10px;height:10px;accent-color:${COLORS.modYellow};` }),
+      createElement('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:7.5px;font-weight:700;margin-top:4px;' },
+        ...(lfoTab === 'LFO 1' || lfoTab === 'LFO 2' ? [
+          { label: 'Stepped', key: lfoPrefix + 'Stepped' },
+          { label: 'Beat Sync', key: lfoPrefix + 'BeatSync' },
+          { label: 'Oneshot', key: lfoPrefix + 'Oneshot' },
+          { label: 'Key Sync', key: lfoPrefix + 'KeySync' },
+          { label: 'Bipolar', key: lfoPrefix + 'Bipolar' },
+          { label: 'Global', key: lfoPrefix + 'Global' },
+        ] : [
+          { label: 'Oneshot', key: 'curveOneshot' },
+          { label: 'Key Sync', key: 'curveKeySync' },
+        ]).map(({ label, key }) =>
+          createElement('label', { key, style: `display:flex;align-items:center;gap:5px;cursor:pointer;text-transform:uppercase;letter-spacing:0.08em;color:${COLORS.modYellow};` },
+            createElement('input', {
+              type: 'checkbox',
+              checked: !!params[key],
+              onchange: (e) => onChange({ target: { name: key, value: e.target.checked } }),
+              style: `width:9px;height:9px;accent-color:${COLORS.modYellow};`,
+            }),
             label
           )
         )
       ),
       createElement('div', { style: 'display:flex;align-items:center;justify-content:space-between;margin-top:auto;' },
         createElement('span', { style: 'font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#666;' }, 'Rate'),
-        Knob({ value: 0.4, size: 22, color: COLORS.modYellow }),
+        Knob({ value: lfoRate, name: lfoPrefix + 'Rate', onChange, size: 22, color: COLORS.modYellow }),
         createElement('span', { style: 'font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#666;' }, 'Depth'),
-        Knob({ value: 0.6, size: 22, color: COLORS.modYellow }),
+        Knob({ value: lfoDepth, name: lfoPrefix + 'Depth', onChange, size: 22, color: COLORS.modYellow }),
       )
     )
   );

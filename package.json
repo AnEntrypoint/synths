@@ -1,0 +1,13 @@
+{
+  "name": "objekt-synth",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Objekt Modeling Synthesizer - Modal/Physical Modeling Synthesis",
+  "scripts": {
+    "render": "node cli.js",
+    "serve": "npx serve -p 3000"
+  },
+  "dependencies": {
+    "web-audio-engine": "^0.13.4"
+  }
+}
