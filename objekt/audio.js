@@ -308,7 +308,7 @@ export function createAudioEngine(onChange) {
     if (eqMidPeak.current) eqMidPeak.current.gain.setTargetAtTime(((p.eqMid ?? 0.5) - 0.5) * 18, now, T);
     if (eqHighShelf.current) eqHighShelf.current.gain.setTargetAtTime(((p.eqHigh ?? 0.5) - 0.5) * 24, now, T);
     if (feedbackGain.current) {
-      const fbAmt = (p.feedbackAmount ?? 0) * 0.7;
+      const fbAmt = (p.feedbackAmount ?? 0) * 0.45;
       feedbackGain.current.gain.setTargetAtTime(fbAmt, now, T);
     }
     if (feedbackDelay.current) {
@@ -526,7 +526,7 @@ export function createAudioEngine(onChange) {
     fbAp.frequency.value = 200 + (params.feedbackColor ?? 0.5) * 7800;
     feedbackAllpass.current = fbAp;
     const fbG = audioCtx.createGain();
-    fbG.gain.value = (params.feedbackAmount ?? 0) * 0.7;
+    fbG.gain.value = (params.feedbackAmount ?? 0) * 0.45;
     feedbackGain.current = fbG;
     const fbWs = audioCtx.createWaveShaper();
     fbWs.oversample = '2x';

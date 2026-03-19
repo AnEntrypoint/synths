@@ -193,9 +193,9 @@ export const PRESETS = {
   },
   'Ethereal Pad': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
-    feedbackAmount: 0.55, feedbackDelay: 0.45, feedbackColor: 0.7, feedbackTimer: 0.4,
+    feedbackAmount: 0.3, feedbackDelay: 0.45, feedbackColor: 0.7, feedbackTimer: 0.4,
     impactLevel: 0.25, impactVel: 0.25, impactFreq: 0.15, impactClick: 0.1, impactShape: 0.2, impactHardness: 0.25, impactTime: 0.45,
-    noiseLevel: 0.7, noiseVel: 0.55, noiseRate: 0.55, noiseDelay: 0.15, noiseA: 0.65, noiseD: 0.85, noiseS: 0.72, noiseR: 0.9,
+    noiseLevel: 0.5, noiseVel: 0.55, noiseRate: 0.55, noiseDelay: 0.15, noiseA: 0.65, noiseD: 0.85, noiseS: 0.72, noiseR: 0.9,
     inputMix: 0.55, trigPos: 0.4, lowCut: 0.08, pitch: 0.5,
     collisionAmount: 0.04, collisionBounce: 0.88, pitchModAmount: 0.35, pitchModFilter: 0.65,
     dispersionFreq: 0.55, dispersionMod: 0.45, dispersionFilter: 0.75,
