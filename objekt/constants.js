@@ -38,6 +38,7 @@ const FX_DEFAULTS = {
 export const PRESETS = {
   'Glass Wave': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.25, feedbackDelay: 0.3, feedbackColor: 0.6, feedbackTimer: 0.2,
     impactLevel: 0.8, impactVel: 0.5, impactFreq: 0.5, impactClick: 0.4, impactShape: 0.1, impactHardness: 0.65, impactTime: 0.15,
     noiseLevel: 0.2, noiseVel: 0.4, noiseRate: 0.25, noiseDelay: 0, noiseA: 0.02, noiseD: 0.35, noiseS: 0.08, noiseR: 0.4,
     inputMix: 0.5, trigPos: 0.3, lowCut: 0.2, pitch: 0.5,
@@ -60,6 +61,7 @@ export const PRESETS = {
   },
   'Nylon Guitar': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.15, feedbackDelay: 0.25, feedbackColor: 0.4, feedbackTimer: 0.15,
     impactLevel: 0.92, impactVel: 0.75, impactFreq: 0.18, impactClick: 0.88, impactShape: 0.0, impactHardness: 0.48, impactTime: 0.025,
     noiseLevel: 0.04, noiseVel: 0.15, noiseRate: 0.05, noiseDelay: 0, noiseA: 0.003, noiseD: 0.08, noiseS: 0.0, noiseR: 0.06,
     inputMix: 0.2, trigPos: 0.8, lowCut: 0.35, pitch: 0.5,
@@ -81,6 +83,7 @@ export const PRESETS = {
   },
   'Tibetan Bowl': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.45, feedbackDelay: 0.35, feedbackColor: 0.55, feedbackTimer: 0.3,
     impactLevel: 0.75, impactVel: 0.45, impactFreq: 0.25, impactClick: 0.2, impactShape: 0.15, impactHardness: 0.55, impactTime: 0.3,
     noiseLevel: 0.15, noiseVel: 0.35, noiseRate: 0.3, noiseDelay: 0.1, noiseA: 0.15, noiseD: 0.6, noiseS: 0.25, noiseR: 0.8,
     inputMix: 0.4, trigPos: 0.5, lowCut: 0.1, pitch: 0.4,
@@ -102,6 +105,7 @@ export const PRESETS = {
   },
   'Church Bell': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.35, feedbackDelay: 0.4, feedbackColor: 0.45, feedbackTimer: 0.25,
     impactLevel: 0.95, impactVel: 0.6, impactFreq: 0.55, impactClick: 0.35, impactShape: 0.4, impactHardness: 0.82, impactTime: 0.06,
     noiseLevel: 0.08, noiseVel: 0.25, noiseRate: 0.22, noiseDelay: 0, noiseA: 0.008, noiseD: 0.2, noiseS: 0.0, noiseR: 0.15,
     inputMix: 0.3, trigPos: 0.5, lowCut: 0.25, pitch: 0.5,
@@ -123,6 +127,7 @@ export const PRESETS = {
   },
   'Wood Block': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0, feedbackDelay: 0.2, feedbackColor: 0.5, feedbackTimer: 0.1,
     impactLevel: 1.0, impactVel: 0.88, impactFreq: 0.45, impactClick: 0.95, impactShape: 0.05, impactHardness: 0.52, impactTime: 0.015,
     noiseLevel: 0.06, noiseVel: 0.22, noiseRate: 0.04, noiseDelay: 0, noiseA: 0.001, noiseD: 0.04, noiseS: 0.0, noiseR: 0.03,
     inputMix: 0.1, trigPos: 0.88, lowCut: 0.45, pitch: 0.5,
@@ -144,6 +149,7 @@ export const PRESETS = {
   },
   'Marimba': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.05, feedbackDelay: 0.2, feedbackColor: 0.35, feedbackTimer: 0.15,
     impactLevel: 0.9, impactVel: 0.62, impactFreq: 0.22, impactClick: 0.65, impactShape: 0.0, impactHardness: 0.45, impactTime: 0.04,
     noiseLevel: 0.025, noiseVel: 0.15, noiseRate: 0.04, noiseDelay: 0, noiseA: 0.002, noiseD: 0.05, noiseS: 0.0, noiseR: 0.04,
     inputMix: 0.25, trigPos: 0.72, lowCut: 0.28, pitch: 0.5,
@@ -165,6 +171,7 @@ export const PRESETS = {
   },
   'Steel Pan': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.3, feedbackDelay: 0.3, feedbackColor: 0.5, feedbackTimer: 0.2,
     impactLevel: 0.88, impactVel: 0.68, impactFreq: 0.4, impactClick: 0.55, impactShape: 0.25, impactHardness: 0.72, impactTime: 0.05,
     noiseLevel: 0.08, noiseVel: 0.28, noiseRate: 0.15, noiseDelay: 0, noiseA: 0.006, noiseD: 0.15, noiseS: 0.02, noiseR: 0.12,
     inputMix: 0.35, trigPos: 0.58, lowCut: 0.22, pitch: 0.5,
@@ -186,6 +193,7 @@ export const PRESETS = {
   },
   'Ethereal Pad': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.55, feedbackDelay: 0.45, feedbackColor: 0.7, feedbackTimer: 0.4,
     impactLevel: 0.25, impactVel: 0.25, impactFreq: 0.15, impactClick: 0.1, impactShape: 0.2, impactHardness: 0.25, impactTime: 0.45,
     noiseLevel: 0.7, noiseVel: 0.55, noiseRate: 0.55, noiseDelay: 0.15, noiseA: 0.65, noiseD: 0.85, noiseS: 0.72, noiseR: 0.9,
     inputMix: 0.55, trigPos: 0.4, lowCut: 0.08, pitch: 0.5,
@@ -208,6 +216,7 @@ export const PRESETS = {
   },
   'Cello': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.5, feedbackDelay: 0.35, feedbackColor: 0.45, feedbackTimer: 0.35,
     impactLevel: 0.18, impactVel: 0.15, impactFreq: 0.08, impactClick: 0.08, impactShape: 0.0, impactHardness: 0.18, impactTime: 0.08,
     noiseLevel: 0.82, noiseVel: 0.65, noiseRate: 0.68, noiseDelay: 0.03, noiseA: 0.35, noiseD: 0.45, noiseS: 0.88, noiseR: 0.65,
     inputMix: 0.48, trigPos: 0.58, lowCut: 0.12, pitch: 0.5,
@@ -229,6 +238,7 @@ export const PRESETS = {
   },
   'Kalimba': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.1, feedbackDelay: 0.2, feedbackColor: 0.55, feedbackTimer: 0.15,
     impactLevel: 0.92, impactVel: 0.72, impactFreq: 0.55, impactClick: 0.78, impactShape: 0.12, impactHardness: 0.62, impactTime: 0.02,
     noiseLevel: 0.035, noiseVel: 0.18, noiseRate: 0.08, noiseDelay: 0, noiseA: 0.002, noiseD: 0.06, noiseS: 0.0, noiseR: 0.04,
     inputMix: 0.2, trigPos: 0.78, lowCut: 0.35, pitch: 0.5,
@@ -250,6 +260,7 @@ export const PRESETS = {
   },
   'Pipe Organ': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0.6, feedbackDelay: 0.4, feedbackColor: 0.5, feedbackTimer: 0.45,
     impactLevel: 0.55, impactVel: 0.4, impactFreq: 0.15, impactClick: 0.28, impactShape: 0.18, impactHardness: 0.35, impactTime: 0.32,
     noiseLevel: 0.48, noiseVel: 0.48, noiseRate: 0.42, noiseDelay: 0.06, noiseA: 0.25, noiseD: 0.55, noiseS: 0.45, noiseR: 0.48,
     inputMix: 0.42, trigPos: 0.45, lowCut: 0.1, pitch: 0.42,
@@ -272,6 +283,7 @@ export const PRESETS = {
   },
   'Kick Drum': {
     ...EXT_DEFAULTS, ...FX_DEFAULTS,
+    feedbackAmount: 0, feedbackDelay: 0.15, feedbackColor: 0.3, feedbackTimer: 0.1,
     impactLevel: 1.0, impactVel: 0.95, impactFreq: 0.02, impactClick: 0.88, impactShape: 0.55, impactHardness: 0.92, impactTime: 0.08,
     noiseLevel: 0.32, noiseVel: 0.55, noiseRate: 0.06, noiseDelay: 0.005, noiseA: 0.002, noiseD: 0.18, noiseS: 0.06, noiseR: 0.22,
     inputMix: 0.28, trigPos: 0.92, lowCut: 0.02, pitch: 0.32,
@@ -316,6 +328,10 @@ export const DEFAULT_PARAMS = {
   routingMode: 'Parallel',
   activePartials: 8,
   keyTrack: 8,
+  feedbackAmount: 0,
+  feedbackDelay: 0.3,
+  feedbackColor: 0.5,
+  feedbackTimer: 0.2,
   ...LFO_DEFAULTS,
   ...PRESETS['Glass Wave'],
 };
