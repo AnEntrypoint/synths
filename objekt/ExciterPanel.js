@@ -29,7 +29,7 @@ function VUMeter({ level, active }) {
       style: `width:5px;height:4px;border-radius:1px;transition:background-color 75ms;background-color:${lit ? color : 'rgba(0,0,0,0.25)'};box-shadow:${lit ? `0 0 3px ${color}` : 'none'};`,
     });
   });
-  return createElement('div', { style: 'display:flex;flex-direction:column-reverse;gap:1.5px;align-items:center;' }, ...segs);
+  return createElement('div', { id: 'vu-meter', style: 'display:flex;flex-direction:column-reverse;gap:1.5px;align-items:center;' }, ...segs);
 }
 
 const MIC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`;
@@ -37,12 +37,6 @@ const MIC_OFF_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="
 const ALERT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
 const RADIO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>`;
 const CHEVRON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
-
-function svgEl(html) {
-  const span = createElement('span', { style: 'display:inline-flex;align-items:center;' });
-  span.innerHTML = html;
-  return span;
-}
 
 export function ExciterPanel({ params, onChange, micState, inputLevel, onRequestMic, onReleaseMic }) {
   const p = params;
@@ -123,7 +117,7 @@ export function ExciterPanel({ params, onChange, micState, inputLevel, onRequest
       createElement('div', { style: 'display:flex;gap:8px;padding:10px;align-items:flex-start;' },
         createElement('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px;' },
           VUMeter({ level: inputLevel, active: micIsActive }),
-          createElement('span', { style: 'font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;color:rgba(0,0,0,0.4);' }, micIsActive ? `${Math.round(inputLevel * 100)}%` : 'IN'),
+          createElement('span', { id: 'vu-label', style: 'font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;color:rgba(0,0,0,0.4);' }, micIsActive ? `${Math.round(inputLevel * 100)}%` : 'IN'),
         ),
         createElement('div', { style: 'width:1px;align-self:stretch;background:rgba(0,0,0,0.1);' }),
         createElement('div', { style: 'display:flex;flex-direction:column;gap:8px;flex:1;' },

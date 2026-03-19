@@ -1,3 +1,5 @@
+import { scheduleNodeCleanup } from './audio-nodes.js';
+
 export function createAudioEngine(onChange) {
   let engineStarted = false;
   let micState = 'idle';
@@ -47,8 +49,13 @@ export function createAudioEngine(onChange) {
 
   const currentRevSize = { current: -1 };
   const currentRevDecay = { current: -1 };
+  const currentDistAmount = { current: -1 };
+  const currentDistDrive = { current: -1 };
+  const currentDistTone = { current: -1 };
+  const currentDistType = { current: '' };
+  let impulseDebounceTimer = null;
 
-  function notify() { onChange({ engineStarted, micState, inputLevel }); }
+  function notify(type) { onChange({ engineStarted, micState, inputLevel, type: type || 'state' }); }
 
   function buildImpulse(audioCtx, duration, decay) {
     const sampleRate = audioCtx.sampleRate;
@@ -138,7 +145,18 @@ export function createAudioEngine(onChange) {
     obj1Bus.current.gain.setTargetAtTime(p.mixObj1, now, T);
     obj2Bus.current.gain.setTargetAtTime(p.mixObj2, now, T);
     if (lowCutHPF.current) lowCutHPF.current.frequency.setTargetAtTime(20 + (p.lowCut ?? 0) * 800, now, T);
-    distShaper.current.curve = makeDistCurve(p.distAmount, p.distDrive, p.distTone ?? 0.5, p.distType ?? 'Tube');
+    const newDistAmount = p.distAmount;
+    const newDistDrive = p.distDrive;
+    const newDistTone = p.distTone ?? 0.5;
+    const newDistType = p.distType ?? 'Tube';
+    if (newDistAmount !== currentDistAmount.current || newDistDrive !== currentDistDrive.current || newDistTone !== currentDistTone.current || newDistType !== currentDistType.current) {
+      distShaper.current.curve = makeDistCurve(newDistAmount, newDistDrive, newDistTone, newDistType);
+      distShaper.current.oversample = newDistAmount > 0.02 ? '4x' : 'none';
+      currentDistAmount.current = newDistAmount;
+      currentDistDrive.current = newDistDrive;
+      currentDistTone.current = newDistTone;
+      currentDistType.current = newDistType;
+    }
     if (micGain.current) micGain.current.gain.setTargetAtTime(Math.max(0.01, p.extGain) * 6.0, now, T);
     if (micHPF.current) {
       const hpfFreq = 20 + p.extHPF * 1200;
@@ -149,9 +167,12 @@ export function createAudioEngine(onChange) {
     const newRevSize = p.revSize ?? 0.5;
     const newRevDecay = p.revDecay ?? 0.5;
     if (reverbConv.current && (Math.abs(newRevSize - currentRevSize.current) > 0.01 || Math.abs(newRevDecay - currentRevDecay.current) > 0.01)) {
-      reverbConv.current.buffer = buildImpulse(ctx.current, 0.5 + newRevSize * 4.5, 0.5 + newRevDecay * 3.5);
       currentRevSize.current = newRevSize;
       currentRevDecay.current = newRevDecay;
+      clearTimeout(impulseDebounceTimer);
+      impulseDebounceTimer = setTimeout(() => {
+        if (ctx.current) reverbConv.current.buffer = buildImpulse(ctx.current, 0.5 + newRevSize * 4.5, 0.5 + newRevDecay * 3.5);
+      }, 100);
     }
     filterBank.current.forEach((node, i) => {
       const mult = p[`modalFreq${i}`] ?? 1;
@@ -286,8 +307,12 @@ export function createAudioEngine(onChange) {
       const coeff = rms > prevEnv ? 0.05 : 0.15;
       prevEnv = prevEnv + coeff * (rms - prevEnv);
       micEnvValueRef.current = prevEnv;
-      inputLevel = Math.min(1, prevEnv * 14);
-      notify();
+      const newLevel = Math.min(1, prevEnv * 14);
+      const q = Math.round(newLevel * 20) / 20;
+      if (q !== Math.round(inputLevel * 20) / 20) {
+        inputLevel = newLevel;
+        notify('level');
+      }
       vuFrameRef.current = requestAnimationFrame(tick);
     };
     vuFrameRef.current = requestAnimationFrame(tick);
@@ -380,7 +405,7 @@ export function createAudioEngine(onChange) {
     if (ctx.current) return;
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive', sampleRate: 44100 });
     ctx.current = audioCtx;
-    const b = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const b = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.5), audioCtx.sampleRate);
     const data = b.getChannelData(0);
     for (let i = 0; i < b.length; i++) data[i] = Math.random() * 2 - 1;
     noiseBuffer.current = b;
@@ -395,7 +420,7 @@ export function createAudioEngine(onChange) {
     hpf.Q.value = 0.5;
     lowCutHPF.current = hpf;
     distShaper.current = audioCtx.createWaveShaper();
-    distShaper.current.oversample = '4x';
+    distShaper.current.oversample = params.distAmount > 0.02 ? '4x' : 'none';
     const eqLow = audioCtx.createBiquadFilter();
     eqLow.type = 'lowshelf'; eqLow.frequency.value = 200;
     eqLowShelf.current = eqLow;
@@ -521,6 +546,7 @@ export function createAudioEngine(onChange) {
     if (extIsActive) return;
     const now = ctx.current.currentTime;
     const diffuseMode = (params.diffuse ?? 0) > 0.5;
+    let maxDuration = 0.1;
     const burstGain = ctx.current.createGain();
     burstGain.gain.setValueAtTime(1, now);
     filterBank.current.forEach(f => burstGain.connect(f.f1));
@@ -551,6 +577,7 @@ export function createAudioEngine(onChange) {
           nSrc.connect(nFilt); nFilt.connect(nEnv); nEnv.connect(burstGain);
           nSrc.start(bTime); nSrc.stop(bTime + 0.05);
         }
+        maxDuration = Math.max(maxDuration, impTime + 0.05);
       } else {
         const osc = ctx.current.createOscillator();
         osc.type = params.impactShape < 0.25 ? 'sine' : params.impactShape < 0.5 ? 'triangle' : params.impactShape < 0.75 ? 'sawtooth' : 'square';
@@ -569,6 +596,7 @@ export function createAudioEngine(onChange) {
         impEnv.gain.exponentialRampToValueAtTime(0.0001, now + impTime);
         osc.connect(impFilter); impFilter.connect(impEnv); impEnv.connect(burstGain);
         osc.start(now); osc.stop(now + impTime + 0.1);
+        maxDuration = Math.max(maxDuration, impTime + 0.1);
         if (hardness > 0.3) {
           const subOsc = ctx.current.createOscillator();
           subOsc.type = 'sine';
@@ -580,6 +608,7 @@ export function createAudioEngine(onChange) {
           subEnv.gain.exponentialRampToValueAtTime(0.0001, now + impTime * 2);
           subOsc.connect(subEnv); subEnv.connect(burstGain);
           subOsc.start(now); subOsc.stop(now + impTime * 2 + 0.1);
+          maxDuration = Math.max(maxDuration, impTime * 2 + 0.1);
         }
         if (params.impactClick > 0.1) {
           const clickSrc = ctx.current.createBufferSource();
@@ -625,7 +654,9 @@ export function createAudioEngine(onChange) {
       noiseEnv.connect(burstGain);
       noiseSrc.start(noiseStart);
       noiseSrc.stop(noiseStart + a + d + 0.8 + r * 3);
+      maxDuration = Math.max(maxDuration, noiseDelay + a + d + 0.8 + r * 3);
     }
+    scheduleNodeCleanup(burstGain, maxDuration);
   }
 
   return { get engineStarted() { return engineStarted; }, get micState() { return micState; }, get inputLevel() { return inputLevel; }, currentPitchRef, initAudio, triggerNote, applyTuning, requestMic, releaseMic };
