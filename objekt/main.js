@@ -12,7 +12,6 @@ const SYNTH_WIDTH = 1100;
 
 const POWER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>`;
 const PLAY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="15" x="3" y="5" rx="1"/><polygon points="14 5 21 12 14 19"/></svg>`;
-const CHEVRON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 
 const state = {
   uiScale: 1,
@@ -31,37 +30,64 @@ const state = {
 let appContainer = null;
 let contentEl = null;
 let pianoMounted = false;
+let changeRAF = 0;
 
-const audio = createAudioEngine(({ engineStarted, micState, inputLevel }) => {
-  state.engineStarted = engineStarted;
-  state.micState = micState;
-  state.inputLevel = inputLevel;
-  render();
+function updateVUMeter() {
+  const container = document.getElementById('vu-meter');
+  if (!container) return;
+  const segs = container.children;
+  const level = state.inputLevel;
+  const active = state.micState === 'active';
+  for (let i = 0; i < segs.length; i++) {
+    const threshold = i / 12;
+    const lit = active && level > threshold;
+    let color = '#22c55e';
+    if (i >= 9) color = '#ef4444';
+    else if (i >= 7) color = '#f59e0b';
+    segs[i].style.backgroundColor = lit ? color : 'rgba(0,0,0,0.25)';
+    segs[i].style.boxShadow = lit ? `0 0 3px ${color}` : 'none';
+  }
+  const label = document.getElementById('vu-label');
+  if (label) label.textContent = active ? `${Math.round(level * 100)}%` : 'IN';
+}
+
+const audio = createAudioEngine((update) => {
+  state.engineStarted = update.engineStarted;
+  state.micState = update.micState;
+  state.inputLevel = update.inputLevel;
+  if (update.type === 'level') {
+    updateVUMeter();
+  } else {
+    render();
+  }
 });
 
 function handleChange(e) {
   const { name, value } = e.target;
-  state.params = { ...state.params, [name]: typeof value === 'string' ? (parseFloat(value) || value) : value };
-  if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
-  render();
+  state.params[name] = typeof value === 'string' ? (parseFloat(value) || value) : value;
+  if (!changeRAF) {
+    changeRAF = requestAnimationFrame(() => {
+      changeRAF = 0;
+      if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
+      render();
+    });
+  }
 }
 
 function loadPreset(e) {
   const name = e.target.value;
   state.currentPreset = name;
-  state.params = { ...state.params, ...PRESETS[name] };
+  Object.assign(state.params, PRESETS[name]);
   if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
   render();
 }
 
 function handleRandomize() {
-  const updates = {};
   for (let i = 0; i < 8; i++) {
     const prefix = state.centerTab === 'modal' ? 'modal' : state.centerTab;
-    updates[`${prefix}Freq${i}`] = parseFloat((Math.random() * 4 + 0.5).toFixed(2));
-    updates[state.centerTab === 'modal' ? `modal${i}` : `${prefix}_${i}`] = parseFloat(Math.random().toFixed(2));
+    state.params[`${prefix}Freq${i}`] = parseFloat((Math.random() * 4 + 0.5).toFixed(2));
+    state.params[state.centerTab === 'modal' ? `modal${i}` : `${prefix}_${i}`] = parseFloat(Math.random().toFixed(2));
   }
-  state.params = { ...state.params, ...updates };
   if (state.engineStarted) audio.applyTuning(audio.currentPitchRef.current, state.params);
   render();
 }
@@ -227,8 +253,12 @@ export function init() {
 
   render();
 
+  let resizeRAF = 0;
   requestAnimationFrame(() => {
     computeScale();
-    window.addEventListener('resize', () => { computeScale(); });
+    window.addEventListener('resize', () => {
+      if (resizeRAF) cancelAnimationFrame(resizeRAF);
+      resizeRAF = requestAnimationFrame(() => { resizeRAF = 0; computeScale(); });
+    });
   });
 }
