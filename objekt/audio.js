@@ -167,9 +167,12 @@ export function createAudioEngine(onChange) {
     const newRevSize = p.revSize ?? 0.5;
     const newRevDecay = p.revDecay ?? 0.5;
     if (reverbConv.current && (Math.abs(newRevSize - currentRevSize.current) > 0.01 || Math.abs(newRevDecay - currentRevDecay.current) > 0.01)) {
-      reverbConv.current.buffer = buildImpulse(ctx.current, 0.5 + newRevSize * 4.5, 0.5 + newRevDecay * 3.5);
       currentRevSize.current = newRevSize;
       currentRevDecay.current = newRevDecay;
+      clearTimeout(impulseDebounceTimer);
+      impulseDebounceTimer = setTimeout(() => {
+        if (ctx.current) reverbConv.current.buffer = buildImpulse(ctx.current, 0.5 + newRevSize * 4.5, 0.5 + newRevDecay * 3.5);
+      }, 100);
     }
     filterBank.current.forEach((node, i) => {
       const mult = p[`modalFreq${i}`] ?? 1;
