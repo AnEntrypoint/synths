@@ -54,6 +54,10 @@ export function createAudioEngine(onChange) {
   const crossObj1ToObj2 = { current: null };
   const crossObj2ToObj1 = { current: null };
   const couplingGain = { current: null };
+  const feedbackDelay = { current: null };
+  const feedbackAllpass = { current: null };
+  const feedbackGain = { current: null };
+  const feedbackShaper = { current: null };
   const portaTarget = { current: null };
   const portaTimer = { current: null };
   const releaseTimer = { current: null };
@@ -303,6 +307,28 @@ export function createAudioEngine(onChange) {
     if (eqLowShelf.current) eqLowShelf.current.gain.setTargetAtTime(((p.eqLow ?? 0.5) - 0.5) * 24, now, T);
     if (eqMidPeak.current) eqMidPeak.current.gain.setTargetAtTime(((p.eqMid ?? 0.5) - 0.5) * 18, now, T);
     if (eqHighShelf.current) eqHighShelf.current.gain.setTargetAtTime(((p.eqHigh ?? 0.5) - 0.5) * 24, now, T);
+    if (feedbackGain.current) {
+      const fbAmt = (p.feedbackAmount ?? 0) * 0.7;
+      feedbackGain.current.gain.setTargetAtTime(fbAmt, now, T);
+    }
+    if (feedbackDelay.current) {
+      const fbDly = 0.001 + (p.feedbackDelay ?? 0.3) * 0.049;
+      feedbackDelay.current.delayTime.setTargetAtTime(fbDly, now, T);
+    }
+    if (feedbackAllpass.current) {
+      const fbColor = 200 + (p.feedbackColor ?? 0.5) * 7800;
+      feedbackAllpass.current.frequency.setTargetAtTime(fbColor, now, T);
+    }
+    if (feedbackShaper.current && ctx.current) {
+      const timer = p.feedbackTimer ?? 0.2;
+      const curve = new Float32Array(256);
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * 2 - 1;
+        const pw = 0.1 + timer * 0.9;
+        curve[i] = Math.abs(x) < pw ? x : x * (1 - (Math.abs(x) - pw) * 2);
+      }
+      feedbackShaper.current.curve = curve;
+    }
   }
 
   function startVUMeter() {
@@ -408,9 +434,9 @@ export function createAudioEngine(onChange) {
     notify();
   }
 
-  async function initAudio(params) {
+  async function initAudio(params, externalCtx) {
     if (ctx.current) return;
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive', sampleRate: 44100 });
+    const audioCtx = externalCtx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive', sampleRate: 44100 });
     ctx.current = audioCtx;
     const b = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
     const data = b.getChannelData(0);
@@ -492,6 +518,32 @@ export function createAudioEngine(onChange) {
       f1.connect(f2); f2.connect(g); g.connect(panner); panner.connect(modalBus.current);
       return { f1, f2, g, panner };
     });
+    const fbDly = audioCtx.createDelay(0.1);
+    fbDly.delayTime.value = 0.001 + (params.feedbackDelay ?? 0.3) * 0.049;
+    feedbackDelay.current = fbDly;
+    const fbAp = audioCtx.createBiquadFilter();
+    fbAp.type = 'allpass';
+    fbAp.frequency.value = 200 + (params.feedbackColor ?? 0.5) * 7800;
+    feedbackAllpass.current = fbAp;
+    const fbG = audioCtx.createGain();
+    fbG.gain.value = (params.feedbackAmount ?? 0) * 0.7;
+    feedbackGain.current = fbG;
+    const fbWs = audioCtx.createWaveShaper();
+    fbWs.oversample = '2x';
+    const timerVal = params.feedbackTimer ?? 0.2;
+    const fbCurve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 255) * 2 - 1;
+      const pw = 0.1 + timerVal * 0.9;
+      fbCurve[i] = Math.abs(x) < pw ? x : x * (1 - (Math.abs(x) - pw) * 2);
+    }
+    fbWs.curve = fbCurve;
+    feedbackShaper.current = fbWs;
+    modalBus.current.connect(fbDly);
+    fbDly.connect(fbAp);
+    fbAp.connect(fbWs);
+    fbWs.connect(fbG);
+    filterBank.current.forEach(node => fbG.connect(node.f1));
     obj1Bank.current = Array.from({ length: 8 }, () => {
       const del = audioCtx.createDelay(1.0); del.delayTime.value = 0.01;
       const damp = audioCtx.createBiquadFilter(); damp.type = 'lowpass'; damp.frequency.value = 8000;
@@ -798,7 +850,7 @@ export function createAudioEngine(onChange) {
     get engineStarted() { return engineStarted; },
     get micState() { return micState; },
     get inputLevel() { return inputLevel; },
-    currentPitchRef, initAudio, triggerNote, releaseNote, applyTuning,
+    currentPitchRef, ctx, initAudio, triggerNote, releaseNote, applyTuning,
     requestMic, releaseMic, updateRouting, updateCoupling,
     get compressor() { return compressor.current; },
   };
